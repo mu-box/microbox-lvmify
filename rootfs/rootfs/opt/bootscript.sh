@@ -5,6 +5,4 @@
 
 mkdir -p /var/lib/lvmify/log
 
-# Launch ACPId
-/etc/rc.d/acpid
-
+/etc/rc.d/resize

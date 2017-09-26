@@ -70,7 +70,7 @@ RUN cp -v /linux-kernel/arch/x86_64/boot/bzImage /tmp/iso/boot/vmlinuz64
 ENV TCL_REPO_BASE       http://distro.ibiblio.org/tinycorelinux/7.x/x86_64
 ENV TCL_REPO_FALLBACK   http://tinycorelinux.net/7.x/x86_64
 
-ENV TCZ_DEPS  e2fsprogs parted liblvm2 udev-lib
+ENV TCZ_DEPS  e2fsprogs parted liblvm2 udev-lib lvm2
 
 # Download the rootfs, don't unpack it though:
 RUN set -ex; \

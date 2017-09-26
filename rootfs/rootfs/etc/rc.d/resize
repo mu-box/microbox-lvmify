@@ -1,0 +1,37 @@
+#!/bin/sh
+
+sleep 10
+
+disk=$(readlink -f /dev/disk/by-path/$(ls /dev/disk/by-path | grep -v part))
+old_partition=$(parted ${disk} print | grep ext4 | awk '{print $1}')
+
+e2fsck -fp ${disk}${old_partition}
+resize2fs ${disk}${old_partition} 1310720
+parted -s ${disk} unit s print
+
+old_part_start=$(parted -s ${disk} unit s print | grep ext4 | awk '{print $2}' | sed 's/s//')
+new_part_end=$(parted -s ${disk} unit s print | grep ext4 | awk '{print $3}' | sed 's/s//')
+
+new_part_start=$((old_part_start+10485760))
+old_part_end=$((new_part_start-1))
+
+new_partition=$((old_partition+1))
+
+parted -s ${disk} unit s rm ${old_partition}
+parted -s ${disk} unit s mkpart ${old_partition} ${old_part_start}s ${old_part_end}s
+parted -s ${disk} unit s mkpart ${new_partition} ${new_part_start}s ${new_part_end}s
+
+partprobe ${disk}
+
+parted -s ${disk} unit s print
+
+pvcreate ${disk}${new_partition}
+vgcreate data ${disk}${new_partition}
+
+mkdir /oldroot
+mount ${disk}${old_partition} /oldroot
+cp /oldroot/boot/grub/grub.bak /oldroot/boot/grub/grub.cfg
+
+sleep 10
+
+reboot
