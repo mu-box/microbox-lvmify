@@ -70,7 +70,7 @@ RUN cp -v /linux-kernel/arch/x86_64/boot/bzImage /tmp/iso/boot/vmlinuz64
 ENV TCL_REPO_BASE       http://distro.ibiblio.org/tinycorelinux/7.x/x86_64
 ENV TCL_REPO_FALLBACK   http://tinycorelinux.net/7.x/x86_64
 
-ENV TCZ_DEPS  e2fsprogs
+ENV TCZ_DEPS  e2fsprogs parted liblvm2 udev-lib
 
 # Download the rootfs, don't unpack it though:
 RUN set -ex; \
@@ -101,7 +101,7 @@ RUN cp -v "$ROOTFS/etc/version" /tmp/iso/version
 COPY rootfs/rootfs $ROOTFS
 
 # Make sure init scripts are executable
-RUN find "$ROOTFS/etc/rc.d/" "$ROOTFS/usr/local/etc/init.d/" -type f -exec chmod --changes +x '{}' +
+RUN find "$ROOTFS/etc/rc.d/" -type f -exec chmod --changes +x '{}' +
 
 # Add serial console (do we need this?)
 RUN set -ex; \
