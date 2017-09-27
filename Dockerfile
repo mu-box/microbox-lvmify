@@ -1,22 +1,24 @@
 FROM debian:jessie
 
-RUN apt-get update && apt-get -y install  unzip \
-                        xz-utils \
-                        curl \
-                        bc \
-                        git \
-                        build-essential \
-                        cpio \
-                        gcc libc6 libc6-dev \
-                        kmod \
-                        squashfs-tools \
-                        genisoimage \
-                        xorriso \
-                        syslinux \
-                        isolinux \
-                        automake \
-                        pkg-config \
-                        p7zip-full
+RUN apt-get update && \
+      apt-get -y install \
+        unzip \
+        xz-utils \
+        curl \
+        bc \
+        git \
+        build-essential \
+        cpio \
+        gcc libc6 libc6-dev \
+        kmod \
+        squashfs-tools \
+        genisoimage \
+        xorriso \
+        syslinux \
+        isolinux \
+        automake \
+        pkg-config \
+        p7zip-full
 
 # https://www.kernel.org/
 ENV KERNEL_VERSION  4.4.88
@@ -70,7 +72,11 @@ RUN cp -v /linux-kernel/arch/x86_64/boot/bzImage /tmp/iso/boot/vmlinuz64
 ENV TCL_REPO_BASE       http://distro.ibiblio.org/tinycorelinux/7.x/x86_64
 ENV TCL_REPO_FALLBACK   http://tinycorelinux.net/7.x/x86_64
 
-ENV TCZ_DEPS  e2fsprogs parted liblvm2 udev-lib lvm2
+ENV TCZ_DEPS  e2fsprogs \
+              parted \
+              liblvm2 \
+              udev-lib \
+              lvm2
 
 # Download the rootfs, don't unpack it though:
 RUN set -ex; \
