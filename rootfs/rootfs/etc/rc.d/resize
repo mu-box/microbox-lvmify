@@ -19,7 +19,11 @@
 #   6 - Reboot
 
 # todo: find out what we're probing for, and wait for that instead of a blanket 10s
-sleep 10
+for countdown in $( seq 60 -1 0 ) ; do
+    [ -d /dev/disk/by-path ] && [ "$(ls -A /dev/disk/by-path)" ] && break
+    echo "waiting for /dev/disk/by-path to populate ($countdown)"
+    sleep 1
+done
 
 # Fetch the attached disk, ignoring partitions
 # todo: this will fail if more than 1 attached disk.
@@ -66,6 +70,12 @@ partprobe ${disk}
 
 # print the new configuration in case someone is watching
 parted -s ${disk} unit s print
+
+for countdown in $( seq 60 -1 0 ) ; do
+    test -b /dev/${disk}${new_partition} && break
+    echo "waiting for ${disk}${new_partition} to be ready ($countdown)"
+    sleep 1
+done
 
 # Now we're going to create the LVM volume group. 
 # 
