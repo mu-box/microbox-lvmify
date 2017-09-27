@@ -71,11 +71,11 @@ partprobe ${disk}
 # print the new configuration in case someone is watching
 parted -s ${disk} unit s print
 
-for countdown in $( seq 60 -1 0 ) ; do
-    test -b /dev/${disk}${new_partition} && break
-    echo "waiting for ${disk}${new_partition} to be ready ($countdown)"
-    sleep 1
-done
+# for countdown in $( seq 60 -1 0 ) ; do
+#     test -b /dev/${disk}${new_partition} && break
+#     echo "waiting for ${disk}${new_partition} to be ready ($countdown)"
+#     sleep 1
+# done
 
 # Now we're going to create the LVM volume group. 
 # 
@@ -102,6 +102,6 @@ mount ${disk}${old_partition} /oldroot
 cp /oldroot/boot/grub/grub.bak /oldroot/boot/grub/grub.cfg
 
 # todo: what are we waiting for?
-sleep 10
+# sleep 10
 
 reboot
