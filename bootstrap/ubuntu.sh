@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+if vgdisplay data > /dev/null 2>&1; then
+  echo "LVM already configured with a 'data' volume group"
+  exit
+fi
+
 # in order to generate the iPXE menu and grub conf, we need to set some
 # global variables to be used throughout this script
 set_menu_vars() {
