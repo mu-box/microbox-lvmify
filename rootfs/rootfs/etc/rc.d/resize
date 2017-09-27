@@ -1,7 +1,22 @@
 #!/bin/sh
 
 # This script is the purpose for this entire distribution.
-# todo: add high-level explanation
+# 
+# The problem we're solving, is that when ordering servers from various 
+# cloud providers, there will be a single disk with a single partition. The
+# root installation will be on this partition. 
+# 
+# Nanobox and Nanogrid employ sophisticated disk configurations and 
+# disk replication technology. In order to apply these configurations, we need
+# the ability to create logical volumes.
+# 
+# To that end, this script will do the following:
+#   1 - Shrink the primary partition to fit the host OS only
+#   2 - Create a second partition, which will use the remainder of disk
+#   3 - Create an LVM physical volume from the second partition
+#   4 - Create an LVM volume group on top of the physical volume, called "data"
+#   5 - Revert grub back to it's prior state
+#   6 - Reboot
 
 # todo: find out what we're probing for, and wait for that instead of a blanket 10s
 sleep 10
