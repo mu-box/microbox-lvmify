@@ -18,11 +18,15 @@
 #   5 - Revert grub back to it's prior state
 #   6 - Reboot
 
-# todo: find out what we're probing for, and wait for that instead of a blanket 10s
+# wait for device probe utilities to be available
 for countdown in $( seq 60 -1 0 ) ; do
-    [ -d /dev/disk/by-path ] && [ "$(ls -A /dev/disk/by-path)" ] && break
-    echo "waiting for /dev/disk/by-path to populate ($countdown)"
-    sleep 1
+  # as soon as the probe utils is ready, break out of the loop
+  [ -d /dev/disk/by-path ] \
+    && [ "$(ls -A /dev/disk/by-path)" ] \
+      && break
+      
+  echo "Waiting for probe utilities to be available ($countdown)..."
+  sleep 1
 done
 
 # Fetch the attached disk, ignoring partitions
