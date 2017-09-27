@@ -1,14 +1,37 @@
 #!/bin/sh
 
+# This script is the purpose for this entire distribution.
+# todo: add high-level explanation
+
+# todo: find out what we're probing for, and wait for that instead of a blanket 10s
 sleep 10
 
+# Fetch the attached disk, ignoring partitions
+# todo: this will fail if more than 1 attached disk.
 disk=$(readlink -f /dev/disk/by-path/$(ls /dev/disk/by-path | grep -v part))
+# fetch the current single partition
+# todo: this could break if there are multiple partitions or if non-ext4 filesystem is used
 old_partition=$(parted ${disk} print | grep ext4 | awk '{print $1}')
 
+# force a fsck on the old partition, which is required for resize2fs to work
 e2fsck -fp ${disk}${old_partition}
+# shrink the filesystem on the old partition to 5G
+# todo: make this dynamic, based on the actual size
 resize2fs ${disk}${old_partition} 1310720
+
+# print the current configuration in case someone is watching
 parted -s ${disk} unit s print
 
+# shrink the old partition to fit just the OS, and create a new partition for LVM
+# 
+# this is accomplished by first dropping the existing partition and then
+# creating a new partition that starts at the same sector, but ends much sooner
+# than the previous partition.
+# 
+# in order to accomplish this feat, we need to do some probing, convertions,
+# and calculations.
+
+# determine the start and new end sector
 old_part_start=$(parted -s ${disk} unit s print | grep ext4 | awk '{print $2}' | sed 's/s//')
 new_part_end=$(parted -s ${disk} unit s print | grep ext4 | awk '{print $3}' | sed 's/s//')
 
@@ -17,21 +40,43 @@ old_part_end=$((new_part_start-1))
 
 new_partition=$((old_partition+1))
 
+# now we remove the existing partition and create a new, smaller one and then
+# another new partition for the remainder of the drive
 parted -s ${disk} unit s rm ${old_partition}
 parted -s ${disk} unit s mkpart ${old_partition} ${old_part_start}s ${old_part_end}s
 parted -s ${disk} unit s mkpart ${new_partition} ${new_part_start}s ${new_part_end}s
 
+# force reading the new partition table
 partprobe ${disk}
 
+# print the new configuration in case someone is watching
 parted -s ${disk} unit s print
 
+# Now we're going to create the LVM volume group. 
+# 
+# This is accomplished by using pvcreate to add the second partition as the 
+# underlying physical volume.
+# 
+# Once we've created the Physical Volume, we'll create a Volume Group on top
+# of the physical volume, called "data". 
+# 
+# With this in place, the host OS can create logical volumes on the "data"
+# Volume Group as needed.
+
+# create the physical volume, and the "data" volume group
 pvcreate ${disk}${new_partition}
 vgcreate data ${disk}${new_partition}
 
+# Now that we've shrunk the root partition, and initialized LVM,
+# we can revert grub back to how it was, and boot into the installed OS
+# 
+# Essentially, we just need to mount the primary partition, and mv the old
+# grub config back into place
 mkdir /oldroot
 mount ${disk}${old_partition} /oldroot
 cp /oldroot/boot/grub/grub.bak /oldroot/boot/grub/grub.cfg
 
+# todo: what are we waiting for?
 sleep 10
 
 reboot
