@@ -42,7 +42,12 @@ EOF
 
 # download iPXE and configure it for the next boot
 setup_ipxe() {
-  curl -k -s -o /boot/ipxe.krn -O http://s3.amazonaws.com/smartos.pagodagrid.io/live/boot/ipxe.krn
+  curl \
+    -k \
+    -s \
+    -o /boot/ipxe.krn \
+    -O http://s3.amazonaws.com/smartos.pagodagrid.io/live/boot/ipxe.krn
+    
   echo "$(script_ipxe)" > /boot/script.ipxe
 }
 
@@ -89,6 +94,13 @@ create_ipxe_grub_menu() {
   rm /etc/grub.d/09_ipxe
 }
 
+# mark this drive so that in the event of multiple disks,
+# lvmify will know which partition is the root partition
+mark_root_partition() {
+  # place a file in the boot partition for identification
+  touch /lvmify.root
+}
+
 echo "Setting boot menu vars..."
 set_menu_vars
 
@@ -97,6 +109,9 @@ setup_ipxe
 
 echo "Configuring menu..."
 create_ipxe_grub_menu
+
+echo "Marking partition for lvmify identification..."
+mark_root_partition
 
 echo "Rebooting..."
 reboot
