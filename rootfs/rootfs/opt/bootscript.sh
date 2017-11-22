@@ -5,4 +5,4 @@
 
 mkdir -p /var/lib/lvmify/log
 
-/etc/rc.d/resize
+# /etc/rc.d/resize

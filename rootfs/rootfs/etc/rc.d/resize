@@ -19,6 +19,7 @@
 #   6 - Reboot
 
 # Globals
+DEBUG=true
 
 # The attached disk containing the root partition
 disk=""
@@ -28,20 +29,6 @@ part=""
 blocks=""
 # Proposed sector size of new partition
 sectors=""
-
-
-wait_probe_utils() {
-  # wait for device probe utilities to be available
-  for countdown in $( seq 60 -1 0 ) ; do
-    # as soon as the probe utils is ready, break out of the loop
-    [ -d /dev/disk/by-path ] \
-      && [ "$(ls -A /dev/disk/by-path)" ] \
-        && break
-        
-    echo "Waiting for probe utilities to be available ($countdown)..."
-    sleep 1
-  done
-}
 
 # find the disk with the root partition marked from the bootstrap,
 # and probe details to set globals that will be used throughout the
@@ -57,34 +44,60 @@ probe_disk() {
   mkdir -p /mnt/probe
   
   # loop through the disks and probe them
-  for partition in $(cat /proc/partitions | awk '{print $4'} | grep [0-9]); do
+  for partition in $(cat /proc/partitions \
+    | awk '{print $4'} \
+    | grep [0-9] \
+    | grep -v ram); do
+      
+    $DEBUG && echo "Checking partition: ${partition}"
+    
     # mount the disk
     mount /dev/${partition} /mnt/probe
     
     # probe to see if this is the root partition
     if [ -f /mnt/probe/lvmify.root ]; then
+      
+      $DEBUG && echo "Marker found."
+      
       # set the disk
       disk=$(echo ${partition} \
         | sed 's/[a-z]*/& /' \
         | awk '{print $1}')
       
+      $DEBUG && echo "disk=${disk}"
+      
       # set the part
       part=$(echo ${partition} \
         | sed 's/[a-z]*/& /' \
         | awk '{print $2}')
+        
+      $DEBUG && echo "part=${part}"
       
       # find the block size
       block_size=$(tune2fs -l /dev/${partition} \
         | grep -i 'block size' \
         | awk '{print $3}')
         
+      $DEBUG && echo "block_size=${block_size}"
+        
       # find the current blocks used
-      used_blocks=$(df --block-size=${block_size} /mnt/probe \
+      used_blocks=$(df -B ${block_size} /mnt/probe \
         | tail -n1 \
         | awk '{print $3}')
         
+      $DEBUG && echo "used_blocks=${used_blocks}"
+        
       # let's give the root partition another 20% to grow into
-      blocks=$(expr ${used_blocks} + ${used_blocks} / 5)
+      blocks=$((${used_blocks} + ${used_blocks} / 5))
+      
+      # The minimum should be 5G
+      min_blocks=$((5*1024*1024*1024 / ${block_size}))
+      
+      if [ $blocks -lt $min_blocks ]; then
+        blocks=$min_blocks
+      fi
+      
+      $DEBUG && echo "blocks=${blocks}"
       
       # find the sector size
       sector_size=$(parted -s /dev/${partition} unit s print \
@@ -93,12 +106,14 @@ probe_disk() {
         | sed 's/.*\///' \
         | sed 's/[A-Z]//')
         
-      sectors=$(expr ${blocks} \* ${block_size} / ${sector_size})
+      $DEBUG && echo "sector_size=${sector_size}"
       
-      # remove the probe identifier
-      rm -f /mnt/probe/lvmify.root
+      sectors=$((${blocks} * ${block_size} / ${sector_size}))
+      
+      $DEBUG && echo "sectors=${sectors}"
       
       # umount
+      $DEBUG && echo "Unmounting"
       umount /mnt/probe
       
       # return now to avoid unecessary loops
@@ -106,24 +121,29 @@ probe_disk() {
     fi
     
     # unmount the partition
+    $DEBUG && echo "Unmounting"
     umount /mnt/probe
   done
 }
 
 repartition() {
     # force a fsck on the old partition, which is required for resize2fs to work
+    $DEBUG && echo "Fscking old partition"
     e2fsck -fp /dev/${disk}${part}
+    
     # shrink the filesystem on the old partition
+    $DEBUG && echo "Shrinking filesystem on old partition"
     resize2fs /dev/${disk}${part} ${blocks}
     
     # print the current configuration in case someone is watching
-    parted -s /dev/${disk} unit s print
+    $DEBUG && parted -s /dev/${disk} unit s print
     
-    # shrink the old partition to fit just the OS, and create a new partition for LVM
+    # shrink the old partition to fit just the OS, 
+    # and create a new partition for LVM
     # 
     # this is accomplished by first dropping the existing partition and then
-    # creating a new partition that starts at the same sector, but ends much sooner
-    # than the previous partition.
+    # creating a new partition that starts at the same sector, but ends much
+    # sooner than the previous partition.
     # 
     # in order to accomplish this feat, we need to do some probing, convertions,
     # and calculations.
@@ -133,33 +153,51 @@ repartition() {
       | grep -e "^ \?${part} " \
       | awk '{print $2}' \
       | sed 's/s//')
+      
+    $DEBUG && echo "old_part_start=${old_part_start}"
+    
     new_part_end=$(parted -s /dev/${disk} unit s print \
       | grep -e "^ \?${part} " \
       | awk '{print $3}' \
       | sed 's/s//')
+      
+    $DEBUG && echo "new_part_end=${new_part_start}"
     
     new_part_start=$((old_part_start+${sectors}))
+    
+    $DEBUG && echo "new_part_start=${new_part_start}"
+    
     old_part_end=$((new_part_start-1))
+    
+    $DEBUG && echo "old_part_end=${old_part_end}"
     
     new_partition=$((part+1))
     
-    # now we remove the existing partition and create a new, smaller one and then
-    # another new partition for the remainder of the drive
+    $DEBUG && echo "new_partition=${new_partition}"
+    
+    # now we remove the existing partition and create a new, smaller one and 
+    # then another new partition for the remainder of the drive
+    $DEBUG && echo "Remove existing root partition"
     parted -s /dev/${disk} unit s rm ${part}
+    
+    $DEBUG && echo "Create new root partition"
     parted -s /dev/${disk} unit s \
       mkpart ${part} ${old_part_start}s ${old_part_end}s
+      
+    $DEBUG && echo "Create data partition for lvm"
     parted -s /dev/${disk} unit s \
       mkpart ${new_partition} ${new_part_start}s ${new_part_end}s
     
     # force reading the new partition table
+    $DEBUG && echo "Read the new partition table"
     partprobe /dev/${disk}
     
     # print the new configuration in case someone is watching
-    parted -s /dev/${disk} unit s print
+    $DEBUG && parted -s /dev/${disk} unit s print
     
     for countdown in $( seq 60 -1 0 ) ; do
         [ -b /dev/${disk}${new_partition} ] && break
-        echo "waiting for /dev/${disk}${new_partition} to be ready ($countdown)"
+        $DEBUG && echo "waiting for /dev/${disk}${new_partition} to be ready ($countdown)"
         sleep 1
     done
     
@@ -175,7 +213,10 @@ repartition() {
     # Volume Group as needed.
     
     # create the physical volume, and the "data" volume group
+    $DEBUG && echo "Create new physical volume"
     pvcreate /dev/${disk}${new_partition}
+    
+    $DEBUG && echo "Create new volume group 'data'"
     vgcreate data /dev/${disk}${new_partition}
 }
 
@@ -185,16 +226,18 @@ restart() {
     # 
     # Essentially, we just need to mount the primary partition, and mv the old
     # grub config back into place
+    
+    $DEBUG && echo "Reset grub and remove partition marker"
     mkdir /oldroot
     mount /dev/${disk}${part} /oldroot
     cp /oldroot/boot/grub/grub.bak /oldroot/boot/grub/grub.cfg
     
+    rm -f /oldroot/lvmify.root
     reboot
 }
 
 
 if ! vgdisplay data > /dev/null 2>&1; then
-  # wait_probe_utils
   probe_disk
   repartition
 fi
