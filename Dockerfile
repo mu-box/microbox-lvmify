@@ -29,7 +29,7 @@ RUN curl \
       https://www.kernel.org/pub/linux/kernel/v${KERNEL_VERSION%%.*}.x/linux-$KERNEL_VERSION.tar.xz \
         | tar -C / -xJ && \
           mv /linux-$KERNEL_VERSION /linux-kernel
-    
+
 COPY kernel_config /linux-kernel/.config
 
 RUN jobs=$(nproc); \
@@ -65,7 +65,7 @@ RUN cd $ROOTFS/lib/modules && \
     rm -rf ./*/kernel/net/bluetooth/* && \
     rm -rf ./*/kernel/net/mac80211/* && \
     rm -rf ./*/kernel/net/wireless/*
-    
+
 # Prepare the ISO directory with the kernel
 RUN cp -v /linux-kernel/arch/x86_64/boot/bzImage /tmp/iso/boot/vmlinuz64
 
@@ -104,7 +104,7 @@ COPY VERSION $ROOTFS/etc/version
 RUN cp -v "$ROOTFS/etc/version" /tmp/iso/version
 
 # Copy our custom rootfs
-COPY rootfs/rootfs $ROOTFS
+COPY files/rootfs $ROOTFS
 
 # Make sure init scripts are executable
 RUN find "$ROOTFS/etc/rc.d/" -type f -exec chmod --changes +x '{}' +
@@ -115,11 +115,11 @@ RUN set -ex; \
 		echo "ttyS${s}:2345:respawn:/usr/local/bin/forgiving-getty ttyS${s}" >> "$ROOTFS/etc/inittab"; \
 	done; \
 	cat "$ROOTFS/etc/inittab"
-  
-# Copy boot params
-COPY rootfs/isolinux /tmp/iso/boot/isolinux
 
-COPY rootfs/make_iso.sh /tmp/make_iso.sh
+# Copy boot params
+COPY files/isolinux /tmp/iso/boot/isolinux
+
+COPY files/make_iso.sh /tmp/make_iso.sh
 
 RUN /tmp/make_iso.sh
 
